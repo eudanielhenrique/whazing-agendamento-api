@@ -86,10 +86,31 @@ Isso vai no campo `templateComponents` (serializado como texto/JSON), com `messa
 
 Endpoint do wrapper pra isso aceita um campo `buttons` (array com `displayText`/`type`/`url`|`copyText`) + `footerText` opcional, e monta o `templateComponents` internamente.
 
+## Cancelamento — implementado
+
+`DELETE /agendar/<id>` — confirmado com o usuário que o cancelamento nativo do Whazing na UI **é um DELETE direto na linha** (não existe status "cancelado"; só `PENDENTE`/`ENVIADA` jamais foram vistos no banco). Wrapper replica isso: só deleta se `tenantId` bate com o token e `status='PENDENTE'`. Testado (`id=74`: criado → cancelado `204` → sumiu do banco → segunda tentativa `404`).
+
+## Template oficial Meta — formato descoberto, NÃO implementado
+
+Descoberto via um agendamento real criado pelo usuário na UI (canal `whatsappId=34`, API oficial Meta) e **cancelado antes de disparar** por gerar custo real (cobrança por template/conversação):
+
+```
+messageType = 'template'
+isTemplate = true
+templateName     = "assinatura_expirar_1_dia"   -- nome exato do template aprovado na Meta
+templateLanguage = "pt_BR"
+templateComponents = [{"type":"body","parameters":[{"type":"text","text":"{{firstName}}"}]}]
+body = mesmo texto do templateName
+```
+
+**Ponto em aberto**: `{{firstName}}` apareceu como placeholder literal, não resolvido pro nome real do contato — não confirmado se o job resolve isso na hora do envio ou se a UI esperava um valor já preenchido. Não foi possível confirmar sem disparar de verdade (custo real).
+
+**Risco de custo**: qualquer teste futuro com `isTemplate=true` deve ser cancelado antes do `sendAt` chegar, ou usado com extrema cautela — diferente de texto/arquivo/botão (grátis via canal não-oficial), template oficial Meta cobra por envio.
+
 Fora de escopo no v1:
-- Template de WhatsApp oficial agendado (`isTemplate=true`) — diferente de botão via Baileys/API Plus, que já está no escopo
+- Template de WhatsApp oficial agendado (`isTemplate=true`) — formato conhecido (ver acima), mas não implementado por causa do custo real de teste
 - Lista interativa (`type: list`), CTA e outros tipos de `/apioficial` além dos 3 tipos de botão confirmados
-- Cancelamento/edição de agendamento (poderia ser um `DELETE`/`PATCH` num v2)
+- Edição de agendamento já criado (hoje é cancelar + criar de novo)
 - Agendamento recorrente / sequência (`Tunel`/`TunelAgendamentos`)
 
 ## Arquitetura

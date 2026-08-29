@@ -85,8 +85,9 @@ Deployado na mesma stack Docker Compose do Whazing (`whazing-net`), atrás de Tr
 - ✅ Agendamento de texto
 - ✅ Agendamento com arquivo (imagem, áudio, vídeo, PDF)
 - ✅ Agendamento com botões interativos (link, resposta rápida, copiar texto)
+- ✅ Cancelamento de agendamento pendente (`DELETE /agendar/<id>`)
 - ❌ Templates oficiais do WhatsApp (Meta) agendados
-- ❌ Cancelamento/edição de agendamento já criado
+- ❌ Edição de agendamento já criado (hoje é cancelar + criar de novo)
 
 ## Validado em produção (2026-08-29)
 

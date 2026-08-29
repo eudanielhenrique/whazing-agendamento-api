@@ -249,5 +249,36 @@ def agendar():
     return jsonify(id=schedule_id, status='PENDENTE', sendAt=send_at.isoformat()), 201
 
 
+@app.route('/agendar/<int:schedule_id>', methods=['DELETE'])
+@require_auth
+def cancelar(schedule_id):
+    tenant_id = request.tenant_id
+
+    conn = get_db()
+    try:
+        with conn.cursor() as cur:
+            cur.execute(
+                'SELECT status FROM "Schedules" WHERE id = %s AND "tenantId" = %s',
+                (schedule_id, tenant_id),
+            )
+            row = cur.fetchone()
+            if row is None:
+                return jsonify(erro='Agendamento não encontrado'), 404
+            if row[0] != 'PENDENTE':
+                return jsonify(erro=f'Agendamento já está "{row[0]}", não é possível cancelar'), 409
+
+            cur.execute('DELETE FROM "Schedules" WHERE id = %s AND "tenantId" = %s', (schedule_id, tenant_id))
+        conn.commit()
+    except Exception:
+        conn.rollback()
+        logging.exception('Erro ao cancelar agendamento')
+        return jsonify(erro='Erro interno ao cancelar agendamento'), 500
+    finally:
+        conn.close()
+
+    logging.info(f'Agendamento {schedule_id} cancelado — tenant={tenant_id}')
+    return '', 204
+
+
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000)

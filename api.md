@@ -106,7 +106,7 @@ Máximo de botões: seguir o limite do WhatsApp (normalmente 3).
 { "id": 70, "status": "PENDENTE", "sendAt": "2026-09-01T10:00:00-03:00" }
 ```
 
-Guarda o `id` se precisar consultar/cancelar depois (cancelamento ainda não existe nessa API — hoje só cria).
+Guarda o `id` se precisar cancelar depois.
 
 **Erro — `400`** (validação): campo obrigatório faltando, `number` fora do formato, `sendAt` no passado ou mal formatado, tipo de botão inválido, tipo de arquivo não suportado.
 ```json
@@ -116,6 +116,24 @@ Guarda o `id` se precisar consultar/cancelar depois (cancelamento ainda não exi
 **Erro — `401`**: token ausente, expirado ou inválido.
 **Erro — `403`**: token revogado (desativado no Whazing).
 **Erro — `500`**: erro interno — logar e não reprocessar automaticamente sem investigar.
+
+## Cancelar um agendamento
+
+```
+DELETE https://agendamento.boraautomatizar.com.br/agendar/<id>
+Authorization: Bearer <token>
+```
+
+Só cancela agendamento do **mesmo tenant** do token, e só enquanto `status='PENDENTE'` (equivalente ao cancelamento que a própria UI do Whazing faz — remove a linha da tabela, não existe status "cancelado").
+
+**Sucesso — `204`** (sem corpo)
+**Erro — `404`**: agendamento não existe, não é desse tenant, ou já foi cancelado
+**Erro — `409`**: agendamento já foi enviado (`status='ENVIADA'`), não dá mais pra cancelar
+
+```bash
+curl -X DELETE https://agendamento.boraautomatizar.com.br/agendar/74 \
+  -H "Authorization: Bearer SEU_TOKEN_AQUI"
+```
 
 ## Comportamento
 
