@@ -107,11 +107,18 @@ body = mesmo texto do templateName
 
 **Risco de custo**: qualquer teste futuro com `isTemplate=true` deve ser cancelado antes do `sendAt` chegar, ou usado com extrema cautela — diferente de texto/arquivo/botão (grátis via canal não-oficial), template oficial Meta cobra por envio.
 
+## Agendamento recorrente — implementado
+
+Achado (usuário mandou print da UI de "Criar Novo Agendamento"): recorrência **não tem nada a ver** com `Tunel`/`TunelAgendamentos` como eu supus inicialmente — é só um dropdown de intervalo (Diário/Semanal/Quinzenal/Mensal/Bimestral/Trimestral/Semestral/Anual) + "Número de repetições". A tabela `Schedules` não tem coluna de recorrência nenhuma, então a UI simplesmente **calcula as N datas futuras e cria N linhas independentes**.
+
+Wrapper implementa igual: campo `recurrence: {interval, repetitions}` no POST, gera as N datas (`sendAt + i * intervalo`) e insere N linhas na mesma transação. Testado (`semanal`, 3 repetições — datas certas, +7 dias cada, depois canceladas via `DELETE`).
+
 Fora de escopo no v1:
 - Template de WhatsApp oficial agendado (`isTemplate=true`) — formato conhecido (ver acima), mas não implementado por causa do custo real de teste
 - Lista interativa (`type: list`), CTA e outros tipos de `/apioficial` além dos 3 tipos de botão confirmados
 - Edição de agendamento já criado (hoje é cancelar + criar de novo)
-- Agendamento recorrente / sequência (`Tunel`/`TunelAgendamentos`)
+- Cancelamento em lote de uma recorrência inteira (hoje precisa de um `DELETE` por `id`)
+- Sequência tipo funil via `Tunel`/`TunelAgendamentos` (recurso separado, não é recorrência simples)
 
 ## Arquitetura
 

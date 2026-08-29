@@ -117,6 +117,40 @@ Guarda o `id` se precisar cancelar depois.
 **Erro — `403`**: token revogado (desativado no Whazing).
 **Erro — `500`**: erro interno — logar e não reprocessar automaticamente sem investigar.
 
+## Agendamento recorrente
+
+Adicione o campo `recurrence` (funciona com texto, arquivo ou botões):
+
+```json
+{
+  "number": "5527999594959",
+  "body": "Lembrete mensal",
+  "sendAt": "2026-09-01T09:00:00-03:00",
+  "recurrence": { "interval": "mensal", "repetitions": 6 }
+}
+```
+
+`interval` (um destes, igual ao dropdown da UI do Whazing): `diario`, `semanal`, `quinzenal` (15 dias), `mensal`, `bimestral`, `trimestral`, `semestral`, `anual`.
+
+`repetitions` = número total de envios (contando o primeiro em `sendAt`). Cada ocorrência vira uma linha independente em `Schedules` — não existe coluna de recorrência no banco, é só como a própria UI do Whazing faz (confirmado: ela calcula as datas e cria N linhas separadas).
+
+**Resposta com `recurrence`** — `201`, formato diferente do modo simples:
+```json
+{
+  "status": "PENDENTE",
+  "count": 3,
+  "schedules": [
+    { "id": 75, "sendAt": "2026-08-29T08:43:05-03:00" },
+    { "id": 76, "sendAt": "2026-09-05T08:43:05-03:00" },
+    { "id": 77, "sendAt": "2026-09-12T08:43:05-03:00" }
+  ]
+}
+```
+
+Pra cancelar uma recorrência inteira, cancele cada `id` individualmente (`DELETE /agendar/<id>` abaixo) — não tem cancelamento em lote ainda.
+
+Testado (`interval=semanal`, `repetitions=3`): as 3 datas saíram certas (+7 dias cada), depois canceladas antes de disparar.
+
 ## Cancelar um agendamento
 
 ```

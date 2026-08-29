@@ -16,8 +16,20 @@ import jwt
 import psycopg2
 import psycopg2.extras
 from dateutil import parser as dateparser
+from dateutil.relativedelta import relativedelta
 from flask import Flask, request, jsonify
 from werkzeug.utils import secure_filename
+
+RECURRENCE_INTERVALS = {
+    'diario': relativedelta(days=1),
+    'semanal': relativedelta(weeks=1),
+    'quinzenal': relativedelta(days=15),
+    'mensal': relativedelta(months=1),
+    'bimestral': relativedelta(months=2),
+    'trimestral': relativedelta(months=3),
+    'semestral': relativedelta(months=6),
+    'anual': relativedelta(years=1),
+}
 
 app = Flask(__name__)
 
@@ -175,6 +187,7 @@ def agendar():
     send_at_raw = data.get('sendAt')
     buttons_raw = data.get('buttons')
     footer_text = data.get('footerText')
+    recurrence_raw = data.get('recurrence')
 
     if not number:
         return jsonify(erro='Campo "number" é obrigatório'), 400
@@ -194,6 +207,24 @@ def agendar():
         send_at = send_at.replace(tzinfo=timezone.utc)
     if send_at <= datetime.now(timezone.utc):
         return jsonify(erro='"sendAt" precisa ser no futuro'), 400
+
+    send_at_list = [send_at]
+    if recurrence_raw:
+        try:
+            recurrence = json.loads(recurrence_raw) if isinstance(recurrence_raw, str) else recurrence_raw
+            interval_name = recurrence['interval']
+            repetitions = int(recurrence.get('repetitions', 1))
+        except (ValueError, KeyError, TypeError):
+            return jsonify(erro='Campo "recurrence" inválido — use {"interval": ..., "repetitions": N}'), 400
+
+        delta = RECURRENCE_INTERVALS.get(interval_name)
+        if delta is None:
+            return jsonify(erro=f'"recurrence.interval" inválido: {interval_name!r} '
+                                 f'(use um de {sorted(RECURRENCE_INTERVALS)})'), 400
+        if repetitions < 1:
+            return jsonify(erro='"recurrence.repetitions" precisa ser >= 1'), 400
+
+        send_at_list = [send_at + i * delta for i in range(repetitions)]
 
     message_type = 'texto'
     template_components = None
@@ -217,26 +248,28 @@ def agendar():
         with conn.cursor() as cur:
             contact_id = resolve_contact(cur, tenant_id, number)
 
-            now = datetime.now(timezone.utc)
-            cur.execute(
-                '''INSERT INTO "Schedules" (
-                       body, "sendAt", "contactId", "userId", "tenantId", "whatsappId",
-                       status, "mediaPath", "mediaName", "Tunel", "isTemplate", "openTicket",
-                       "messageType", "templateComponents", "createdAt", "updatedAt"
-                   ) VALUES (
-                       %s, %s, %s, %s, %s, %s,
-                       'PENDENTE', %s, %s, false, false, false,
-                       %s, %s, %s, %s
-                   ) RETURNING id''',
-                (
-                    body, send_at, contact_id, user_id, tenant_id, whatsapp_id,
-                    media_path, media_name,
-                    message_type,
-                    json.dumps(template_components) if template_components else None,
-                    now, now,
-                ),
-            )
-            schedule_id = cur.fetchone()[0]
+            created = []
+            for occurrence_send_at in send_at_list:
+                now = datetime.now(timezone.utc)
+                cur.execute(
+                    '''INSERT INTO "Schedules" (
+                           body, "sendAt", "contactId", "userId", "tenantId", "whatsappId",
+                           status, "mediaPath", "mediaName", "Tunel", "isTemplate", "openTicket",
+                           "messageType", "templateComponents", "createdAt", "updatedAt"
+                       ) VALUES (
+                           %s, %s, %s, %s, %s, %s,
+                           'PENDENTE', %s, %s, false, false, false,
+                           %s, %s, %s, %s
+                       ) RETURNING id''',
+                    (
+                        body, occurrence_send_at, contact_id, user_id, tenant_id, whatsapp_id,
+                        media_path, media_name,
+                        message_type,
+                        json.dumps(template_components) if template_components else None,
+                        now, now,
+                    ),
+                )
+                created.append({'id': cur.fetchone()[0], 'sendAt': occurrence_send_at.isoformat()})
         conn.commit()
     except Exception:
         conn.rollback()
@@ -245,8 +278,12 @@ def agendar():
     finally:
         conn.close()
 
-    logging.info(f'Agendamento {schedule_id} criado — tenant={tenant_id} number={number} sendAt={send_at}')
-    return jsonify(id=schedule_id, status='PENDENTE', sendAt=send_at.isoformat()), 201
+    ids = [c['id'] for c in created]
+    logging.info(f'Agendamento(s) {ids} criado(s) — tenant={tenant_id} number={number}')
+
+    if len(created) == 1:
+        return jsonify(id=created[0]['id'], status='PENDENTE', sendAt=created[0]['sendAt']), 201
+    return jsonify(schedules=created, status='PENDENTE', count=len(created)), 201
 
 
 @app.route('/agendar/<int:schedule_id>', methods=['DELETE'])

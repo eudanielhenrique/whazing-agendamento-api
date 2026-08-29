@@ -86,8 +86,10 @@ Deployado na mesma stack Docker Compose do Whazing (`whazing-net`), atrás de Tr
 - ✅ Agendamento com arquivo (imagem, áudio, vídeo, PDF)
 - ✅ Agendamento com botões interativos (link, resposta rápida, copiar texto)
 - ✅ Cancelamento de agendamento pendente (`DELETE /agendar/<id>`)
+- ✅ Agendamento recorrente (diário/semanal/quinzenal/mensal/bimestral/trimestral/semestral/anual)
 - ❌ Templates oficiais do WhatsApp (Meta) agendados
 - ❌ Edição de agendamento já criado (hoje é cancelar + criar de novo)
+- ❌ Cancelamento em lote de uma recorrência inteira (hoje é um `DELETE` por `id`)
 
 ## Validado em produção (2026-08-29)
 
