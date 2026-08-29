@@ -2,6 +2,23 @@
 
 Uso: agendar envio de mensagem (texto, arquivo, ou mensagem com botões) pra um horário futuro no WhatsApp via Whazing. Não existe isso na API oficial do Whazing — essa API cobre esse buraco.
 
+## Checklist rápido — o que mandar no POST
+
+Sempre, nos 3 modos:
+- **Header** `Authorization: Bearer <token>` — obrigatório
+- `number` — obrigatório, só dígitos, DDI+DDD+número
+- `sendAt` — obrigatório, ISO 8601 **com timezone**, no futuro
+- `body` — obrigatório (texto da mensagem; nos botões é o texto principal)
+
+Por modo:
+| Modo | Content-Type | Campo extra obrigatório | Campos extra opcionais |
+|---|---|---|---|
+| Texto | `application/json` | — | — |
+| Arquivo | `multipart/form-data` | `media` (o arquivo) | — |
+| Botões | `application/json` | `buttons` (array) | `footerText` |
+
+Nada mais é obrigatório. `externalKey` da API oficial de mensagens **não existe** aqui (a tabela `Schedules` não tem essa coluna) — se mandar, é ignorado.
+
 ## Quando usar
 
 Use esse endpoint sempre que precisar **agendar uma mensagem pra enviar depois** em vez de mandar na hora — por exemplo:
@@ -59,7 +76,7 @@ media: (arquivo — imagem, áudio, vídeo ou PDF)
 }
 ```
 
-Também dá pra combinar botões com imagem de cabeçalho: manda como `multipart/form-data` com `media` + `buttons` (como string JSON) + os demais campos.
+Também dá pra combinar botões com imagem de cabeçalho: manda como `multipart/form-data` com `media` + `buttons` (como string JSON) + os demais campos. **Não testado em produção ainda** — os 3 modos abaixo foram validados separadamente, a combinação botão+arquivo é só teoricamente suportada pelo código (mesmo caminho de `save_media` + `templateComponents`, mas nunca disparada de verdade).
 
 ## Campos
 
@@ -105,6 +122,18 @@ Guarda o `id` se precisar consultar/cancelar depois (cancelamento ainda não exi
 - A mensagem fica com `status=PENDENTE` até o horário `sendAt` chegar — um job do Whazing processa e envia automaticamente, sem precisar de nada nosso depois de criada.
 - Se o `number` não existir como contato ainda, a API cria o contato automaticamente nesse tenant.
 - Não há confirmação de entrega própria — pra saber se enviou, seria necessário consultar o Whazing (fora do escopo dessa API por enquanto).
+
+## Validado em produção
+
+Testado de ponta a ponta em 2026-08-29 (tenant 1, canal BoraAutomatizar) — os 3 modos abaixo foram criados via API e confirmados como `ENVIADA` no WhatsApp real:
+
+| Modo | id | Resultado |
+|---|---|---|
+| Texto | 68 | ENVIADA |
+| Arquivo (imagem) | 69 | ENVIADA |
+| Botões (url + reply + copy) | 70 | ENVIADA |
+
+Combinação botão+arquivo junto: não testada (ver nota acima).
 
 ## Exemplo cURL
 
