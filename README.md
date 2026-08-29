@@ -87,4 +87,16 @@ Deployado na mesma stack Docker Compose do Whazing (`whazing-net`), atrás de Tr
 - ✅ Agendamento com botões interativos (link, resposta rápida, copiar texto)
 - ❌ Templates oficiais do WhatsApp (Meta) agendados
 - ❌ Cancelamento/edição de agendamento já criado
+
+## Validado em produção (2026-08-29)
+
+Testado de ponta a ponta — texto, arquivo e botões — e confirmado tanto no WhatsApp real quanto no painel do Whazing.
+
+**WhatsApp:**
+
+![Teste no WhatsApp](./docs/whatsapp-teste.png)
+
+**Painel do Whazing** (ticket exibindo os agendamentos processados):
+
+![Teste no painel Whazing](./docs/painel-whazing-teste.png)
 - ❌ Agendamento recorrente / sequência (funil)
