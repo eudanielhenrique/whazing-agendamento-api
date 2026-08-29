@@ -101,4 +101,3 @@ Testado de ponta a ponta — texto, arquivo e botões — e confirmado tanto no 
 <td width="50%"><b>Painel do Whazing</b><br><img src="./docs/painel-whazing-teste.png" width="100%"></td>
 </tr>
 </table>
-- ❌ Agendamento recorrente / sequência (funil)
