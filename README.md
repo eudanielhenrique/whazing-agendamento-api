@@ -93,11 +93,10 @@ Deployado na mesma stack Docker Compose do Whazing (`whazing-net`), atrás de Tr
 
 Testado de ponta a ponta — texto, arquivo e botões — e confirmado tanto no WhatsApp real quanto no painel do Whazing.
 
-**WhatsApp:**
-
-![Teste no WhatsApp](./docs/whatsapp-teste.png)
-
-**Painel do Whazing** (ticket exibindo os agendamentos processados):
-
-![Teste no painel Whazing](./docs/painel-whazing-teste.png)
+<table>
+<tr>
+<td width="50%"><b>WhatsApp</b><br><img src="./docs/whatsapp-teste.png" width="100%"></td>
+<td width="50%"><b>Painel do Whazing</b><br><img src="./docs/painel-whazing-teste.png" width="100%"></td>
+</tr>
+</table>
 - ❌ Agendamento recorrente / sequência (funil)
