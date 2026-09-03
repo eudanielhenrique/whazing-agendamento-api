@@ -210,3 +210,63 @@ curl -X POST https://agendamento.boraautomatizar.com.br/agendar \
   -F "sendAt=2026-09-02T09:00:00-03:00" \
   -F "media=@/caminho/proposta.pdf;type=application/pdf"
 ```
+
+---
+
+# API de Nota Interna no Ticket — Whazing (wrapper não-oficial)
+
+Uso: criar uma nota interna (visível só pra equipe, nunca pro cliente) direto na timeline de um ticket — o mesmo recurso do botão "Adicionar anotação no ticket" no painel. Não existe endpoint oficial documentado pra isso; essa rota escreve direto na tabela `TicketNotes`, que o painel já lê e renderiza (achado 2026-09-03, inspecionando o banco).
+
+## Endpoint
+
+```
+POST https://agendamento.boraautomatizar.com.br/nota
+Authorization: Bearer <token>
+Content-Type: application/json
+```
+
+Mesmo token Bearer da API oficial/de agendamento — identifica o tenant automaticamente.
+
+## Corpo da requisição
+
+```json
+{
+  "ticketId": 12182,
+  "note": "Cliente pediu retorno sobre o pedido #123, transferido pro atendente Maria."
+}
+```
+
+| Campo | Obrigatório | Descrição |
+|---|---|---|
+| `ticketId` | sim | id do ticket (inteiro) |
+| `note` | sim | texto da nota |
+
+`contactId` é resolvido automaticamente a partir do `ticketId` — não precisa informar.
+
+## Resposta
+
+**Sucesso — `201`**
+```json
+{ "id": 3, "ticketId": 12182, "createdAt": "2026-09-03T13:54:40.875758+00:00" }
+```
+
+**Erro — `400`**: `ticketId` ou `note` ausente.
+**Erro — `404`**: ticket não encontrado (ou não pertence ao tenant do token).
+**Erro — `401`/`403`**: token ausente, expirado ou revogado.
+
+## Comportamento
+
+- A nota aparece na timeline do ticket no painel do Whazing, igual a uma anotação criada manualmente — nunca é enviada como mensagem de WhatsApp.
+- Sem paralelo com `Schedules`: a nota é gravada e já fica visível imediatamente, não tem processamento assíncrono.
+
+## Exemplo cURL
+
+```bash
+curl -X POST https://agendamento.boraautomatizar.com.br/nota \
+  -H "Authorization: Bearer SEU_TOKEN_AQUI" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "ticketId": 12182,
+    "note": "Resumo: paciente pediu consulta de ortopedia, preferência manhã. Transferido pro atendente."
+  }'
+```
