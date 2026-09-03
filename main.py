@@ -286,6 +286,53 @@ def agendar():
     return jsonify(schedules=created, status='PENDENTE', count=len(created)), 201
 
 
+@app.route('/nota', methods=['POST'])
+@require_auth
+def criar_nota():
+    tenant_id = request.tenant_id
+    user_id = request.user_id
+
+    data = request.get_json(silent=True) or {}
+    ticket_id = data.get('ticketId')
+    note = (data.get('note') or '').strip()
+
+    if not isinstance(ticket_id, int):
+        return jsonify(erro='Campo "ticketId" é obrigatório (inteiro)'), 400
+    if not note:
+        return jsonify(erro='Campo "note" é obrigatório'), 400
+
+    conn = get_db()
+    try:
+        with conn.cursor() as cur:
+            cur.execute(
+                'SELECT "contactId" FROM "Tickets" WHERE id = %s AND "tenantId" = %s',
+                (ticket_id, tenant_id),
+            )
+            row = cur.fetchone()
+            if row is None:
+                return jsonify(erro='Ticket não encontrado'), 404
+            contact_id = row[0]
+
+            now = datetime.now(timezone.utc)
+            cur.execute(
+                '''INSERT INTO "TicketNotes" (
+                       note, "userId", "contactId", "ticketId", "tenantId", "createdAt", "updatedAt"
+                   ) VALUES (%s, %s, %s, %s, %s, %s, %s) RETURNING id''',
+                (note, user_id, contact_id, ticket_id, tenant_id, now, now),
+            )
+            note_id = cur.fetchone()[0]
+        conn.commit()
+    except Exception:
+        conn.rollback()
+        logging.exception('Erro ao criar nota interna')
+        return jsonify(erro='Erro interno ao criar nota'), 500
+    finally:
+        conn.close()
+
+    logging.info(f'Nota {note_id} criada — tenant={tenant_id} ticket={ticket_id}')
+    return jsonify(id=note_id, ticketId=ticket_id, createdAt=now.isoformat()), 201
+
+
 @app.route('/agendar/<int:schedule_id>', methods=['DELETE'])
 @require_auth
 def cancelar(schedule_id):
