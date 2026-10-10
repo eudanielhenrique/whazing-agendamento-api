@@ -15,6 +15,7 @@ from functools import wraps
 import jwt
 import psycopg2
 import psycopg2.extras
+import requests
 from dateutil import parser as dateparser
 from dateutil.relativedelta import relativedelta
 from flask import Flask, request, jsonify
@@ -51,6 +52,15 @@ DB_CONFIG = dict(
 
 PUBLIC_DIR = os.environ.get('PUBLIC_DIR', '/app/public')
 
+# Proxy transparente pra Datasigh — não guarda nem valida credencial própria, só repassa o
+# header Authorization que o chamador mandar. Existe só pra filtrar diaSemana antes do dado
+# chegar no agente (ex: Dr. Vinícius NUNCA atende terça/quinta/sexta, mas a Datasigh às vezes
+# devolve vaga nesses dias mesmo assim — ver ticket 16031, 2026-10-09: o agente ofereceu uma
+# vaga de quinta, o paciente mandou documento, e só 2h depois o agente percebeu que não podia
+# ter oferecido aquele dia. Filtrar aqui, no dado, é mais seguro que confiar que o prompt do
+# agente vai lembrar da regra toda vez que listar uma resposta de /horarios).
+DATASIGH_HORARIOS_URL = 'https://ws.datasigh.com.br/api/integracao/v1/horarios'
+
 ALLOWED_MEDIA_CONTENT_TYPES = {
     'audio/mpeg', 'audio/mp3', 'audio/ogg', 'audio/wav', 'audio/x-wav',
     'image/jpeg', 'image/png', 'image/webp', 'image/gif',
@@ -61,6 +71,50 @@ ALLOWED_MEDIA_CONTENT_TYPES = {
 
 def get_db():
     return psycopg2.connect(**DB_CONFIG)
+
+
+@app.route('/datasigh/horarios', methods=['GET'])
+def datasigh_horarios():
+    auth = request.headers.get('Authorization', '')
+    if not auth:
+        return jsonify(erro='Header Authorization ausente'), 401
+
+    params = request.args.to_dict()
+    # excludeMap: JSON tipo {"<idProfissional>": ["Terça-feira", "Quinta-feira", ...]} — nunca
+    # vai pra Datasigh, só decide o que esse wrapper tira do resultado antes de devolver.
+    exclude_map_raw = params.pop('excludeMap', None)
+    exclude_days = set()
+    if exclude_map_raw:
+        try:
+            exclude_map = json.loads(exclude_map_raw)
+            exclude_days = set(exclude_map.get(str(params.get('idProfissional', '')), []))
+        except (ValueError, AttributeError, TypeError):
+            logging.warning('excludeMap inválido recebido: %r', exclude_map_raw)
+
+    try:
+        upstream = requests.get(
+            DATASIGH_HORARIOS_URL,
+            params=params,
+            headers={'Authorization': auth},
+            timeout=15,
+        )
+    except requests.RequestException:
+        logging.exception('Erro ao chamar Datasigh /horarios')
+        return jsonify(erro='Erro ao consultar Datasigh'), 502
+
+    content_type = upstream.headers.get('Content-Type', 'application/json')
+    if upstream.status_code != 200:
+        return upstream.content, upstream.status_code, {'Content-Type': content_type}
+
+    try:
+        data = upstream.json()
+    except ValueError:
+        return upstream.content, upstream.status_code, {'Content-Type': content_type}
+
+    if exclude_days and isinstance(data, list):
+        data = [item for item in data if item.get('diaSemana') not in exclude_days]
+
+    return jsonify(data)
 
 
 def require_auth(f):
